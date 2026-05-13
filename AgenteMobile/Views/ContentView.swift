@@ -8,19 +8,37 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var chatViewModel: ChatViewModel
+    @StateObject private var fileRepository: FileRepository
+
+    init() {
+        let claudeRepository = ClaudeRepository()
+        let fileRepository = FileRepository()
+        let speechRecognizer = SpeechRecognizerService()
+
+        let chatViewModel = ChatViewModel(
+            claudeRepository: claudeRepository,
+            fileRepository: fileRepository,
+            speechRecognizer: speechRecognizer
+        )
+
+        _chatViewModel = StateObject(wrappedValue: chatViewModel)
+        _fileRepository = StateObject(wrappedValue: fileRepository)
+    }
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, AgenteMobile!")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-            Text("POC - iPad Agent")
-                .font(.body)
-                .foregroundStyle(.secondary)
+        HStack(spacing: 0) {
+            // Chat View (40%)
+            ChatView(viewModel: chatViewModel)
+                .frame(maxWidth: .infinity)
+
+            Divider()
+
+            // Files View (60%)
+            FileListView(fileRepository: fileRepository)
+                .frame(maxWidth: .infinity)
         }
-        .padding()
+        .background(Color(.systemBackground))
     }
 }
 

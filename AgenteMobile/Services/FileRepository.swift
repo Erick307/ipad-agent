@@ -1,5 +1,5 @@
 //
-//  FileManagerService.swift
+//  FileRepository.swift
 //  AgenteMobile
 //
 //  Created by Erick Silva
@@ -8,7 +8,7 @@
 import Foundation
 import Combine
 
-class FileManagerService: ObservableObject {
+class FileRepository: ObservableObject {
     @Published var files: [GeneratedFile] = []
 
     var documentDirectory: URL {

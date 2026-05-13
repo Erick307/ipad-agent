@@ -29,7 +29,18 @@ class ClaudeRepository {
         messages: [Message],
         systemPrompt: String
     ) async throws -> ClaudeResponse {
-        // TODO: Implement Claude API call with tool calling
-        throw NSError(domain: "NotImplemented", code: -1)
+        // Mock implementation - returns placeholder message
+        // This will be replaced with real Anthropic API integration
+
+        // Simulate network delay
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+
+        let mockResponse = ClaudeResponse(
+            id: UUID().uuidString,
+            textContent: "🤖 AI is not connected yet. Real Claude API integration coming soon!",
+            toolCalls: nil
+        )
+
+        return mockResponse
     }
 }
