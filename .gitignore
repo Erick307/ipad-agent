@@ -1,0 +1,35 @@
+# Xcode
+build/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcworkspace
+xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+.DS_Store
+
+# Swift Package Manager
+.build/
+*.xcconfig
+Packages/
+
+# CocoaPods
+Pods/
+*.podspec
+Podfile.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# API Keys (NEVER commit these!)
+Constants.swift
