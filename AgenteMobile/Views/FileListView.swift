@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct FileListView: View {
-    @ObservedObject var fileRepository: FileRepository
+    var fileRepository: FileRepository
     @State private var selectedFile: GeneratedFile?
     @State private var showingFileDetail = false
 

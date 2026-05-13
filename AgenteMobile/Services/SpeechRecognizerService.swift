@@ -6,13 +6,14 @@
 //
 
 import Foundation
-import Combine
+import Observation
 import Speech
 import AVFoundation
 
-class SpeechRecognizerService: ObservableObject {
-    @Published var recognizedText: String = ""
-    @Published var isRecording: Bool = false
+@Observable
+final class SpeechRecognizerService {
+    var recognizedText: String = ""
+    var isRecording: Bool = false
 
     func startRecording() async {
         // TODO: Implement speech recognition start

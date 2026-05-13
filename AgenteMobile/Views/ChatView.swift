@@ -1,14 +1,8 @@
-//
-//  ChatView.swift
-//  AgenteMobile
-//
-//  Created by Erick Silva
-//
-
 import SwiftUI
+import Observation
 
 struct ChatView: View {
-    @ObservedObject var viewModel: ChatViewModel
+    var viewModel: ChatViewModel
     @State private var inputText: String = ""
 
     var body: some View {

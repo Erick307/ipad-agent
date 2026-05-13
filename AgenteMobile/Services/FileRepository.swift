@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import Combine
+import Observation
 
-class FileRepository: ObservableObject {
-    @Published var files: [GeneratedFile] = []
+@Observable
+final class FileRepository {
+    var files: [GeneratedFile] = []
 
     var documentDirectory: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]

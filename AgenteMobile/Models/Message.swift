@@ -1,10 +1,3 @@
-//
-//  Message.swift
-//  AgenteMobile
-//
-//  Created by Erick Silva
-//
-
 import Foundation
 
 struct Message: Identifiable, Codable {
@@ -12,7 +5,7 @@ struct Message: Identifiable, Codable {
     let role: String // "user" or "assistant"
     let content: String
     let timestamp: Date
-    let isError: Bool = false
+    var isError: Bool = false
 
     var isSentByUser: Bool { role == "user" }
 }

@@ -1,10 +1,3 @@
-//
-//  GeneratedFile.swift
-//  AgenteMobile
-//
-//  Created by Erick Silva
-//
-
 import Foundation
 
 struct GeneratedFile: Identifiable, Codable {

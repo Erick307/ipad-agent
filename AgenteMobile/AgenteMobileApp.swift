@@ -1,14 +1,8 @@
-//
-//  AgenteMobileApp.swift
-//  AgenteMobile
-//
-//  Created by Erick Silva
-//
-
 import SwiftUI
 
 @main
 struct AgenteMobileApp: App {
+    let dependencyContainer = DependencyContainer()
     var body: some Scene {
         WindowGroup {
             ContentView()

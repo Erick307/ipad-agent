@@ -1,15 +1,9 @@
-//
-//  ContentView.swift
-//  AgenteMobile
-//
-//  Created by Erick Silva
-//
-
 import SwiftUI
+import Observation
 
 struct ContentView: View {
-    @StateObject private var chatViewModel: ChatViewModel
-    @StateObject private var fileRepository: FileRepository
+    @State private var chatViewModel: ChatViewModel
+    @State private var fileRepository: FileRepository
 
     init() {
         let claudeRepository = ClaudeRepository()
@@ -22,8 +16,8 @@ struct ContentView: View {
             speechRecognizer: speechRecognizer
         )
 
-        _chatViewModel = StateObject(wrappedValue: chatViewModel)
-        _fileRepository = StateObject(wrappedValue: fileRepository)
+        _chatViewModel = State(initialValue: chatViewModel)
+        _fileRepository = State(initialValue: fileRepository)
     }
 
     var body: some View {
