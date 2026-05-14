@@ -10,7 +10,6 @@ import SwiftUI
 struct FileListView: View {
     var fileRepository: FileRepository
     @State private var selectedFile: GeneratedFile?
-    @State private var showingFileDetail = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,17 +49,16 @@ struct FileListView: View {
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 selectedFile = file
-                                showingFileDetail = true
                             }
                     }
                 }
                 .listStyle(.plain)
             }
         }
-        .sheet(isPresented: $showingFileDetail) {
-            if let file = selectedFile {
-                FileDetailView(file: file, isPresented: $showingFileDetail)
-            }
+        // .sheet(item:) guarantees the file is non-nil when the sheet renders,
+        // eliminating the race condition that caused an empty view on first open.
+        .sheet(item: $selectedFile) { file in
+            FileDetailView(file: file)
         }
     }
 }
@@ -100,7 +98,7 @@ struct FileListRow: View {
 
 struct FileDetailView: View {
     let file: GeneratedFile
-    @Binding var isPresented: Bool
+    @Environment(\.dismiss) private var dismiss
     @State private var isCopied = false
 
     var body: some View {
@@ -122,12 +120,10 @@ struct FileDetailView: View {
 
                 // Content
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(file.content)
-                            .font(.system(.body, design: .monospaced))
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                    Text(file.content)
+                        .font(.system(.body, design: .monospaced))
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 // Actions
@@ -162,7 +158,7 @@ struct FileDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
-                        isPresented = false
+                        dismiss()
                     }
                 }
             }

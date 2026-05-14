@@ -57,7 +57,7 @@ final class FileRepository {
 
         let filePath = documentDirectory.appendingPathComponent(filename)
         let data = content.data(using: .utf8) ?? Data()
-        try data.write(to: filePath)
+        try data.write(to: filePath, options: .atomic)
 
         let file = GeneratedFile(
             id: UUID(),
