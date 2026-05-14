@@ -51,14 +51,23 @@ struct FileListView: View {
                                 selectedFile = file
                             }
                     }
+                    .onDelete { offsets in
+                        Task {
+                            for index in offsets {
+                                let file = fileRepository.files[index]
+                                try? await fileRepository.deleteFile(file)
+                            }
+                        }
+                    }
                 }
                 .listStyle(.plain)
             }
         }
-        // .sheet(item:) guarantees the file is non-nil when the sheet renders,
-        // eliminating the race condition that caused an empty view on first open.
         .sheet(item: $selectedFile) { file in
-            FileDetailView(file: file)
+            FileDetailView(file: file) {
+                Task { try? await fileRepository.deleteFile(file) }
+                selectedFile = nil
+            }
         }
     }
 }
@@ -86,6 +95,10 @@ struct FileListRow: View {
 
                 Spacer()
 
+                Text(file.sizeInKB)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -98,8 +111,11 @@ struct FileListRow: View {
 
 struct FileDetailView: View {
     let file: GeneratedFile
+    let onDelete: () -> Void
+
     @Environment(\.dismiss) private var dismiss
     @State private var isCopied = false
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -109,9 +125,13 @@ struct FileDetailView: View {
                     Text(file.name)
                         .font(.title2)
                         .fontWeight(.bold)
-                    Text(file.createdDate, style: .date)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text(file.createdDate, style: .date)
+                        Text("·")
+                        Text(file.sizeInKB)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
@@ -155,10 +175,29 @@ struct FileDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
+                    Button("Close") { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
                     }
                 }
+            }
+            .confirmationDialog(
+                "Delete \"\(file.name)\"?",
+                isPresented: $showDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    dismiss()
+                    onDelete()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This action cannot be undone.")
             }
         }
     }

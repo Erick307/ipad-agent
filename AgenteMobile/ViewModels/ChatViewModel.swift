@@ -141,6 +141,7 @@ final class ChatViewModel {
         case "write_file":  return await executeWriteFile(toolCall)
         case "read_file":   return await executeReadFile(toolCall)
         case "list_files":  return await executeListFiles()
+        case "delete_file": return await executeDeleteFile(toolCall)
         default:
             print("⚠️ Unknown tool: \(toolCall.name)")
             return "Error: Unknown tool '\(toolCall.name)'"
@@ -182,6 +183,22 @@ final class ChatViewModel {
         }
     }
 
+    private func executeDeleteFile(_ toolCall: ToolCall) async -> String {
+        let filename = toolCall.input["filename"]?.stringValue ?? ""
+        guard !filename.isEmpty else { return "Error: filename is required" }
+
+        print("🔧 delete_file: \(filename)")
+
+        do {
+            try await fileRepository.deleteFileByName(filename)
+            print("✅ File deleted: \(filename)")
+            return "File '\(filename)' deleted successfully."
+        } catch {
+            print("❌ delete_file error: \(error)")
+            return "Error deleting '\(filename)': \(error.localizedDescription)"
+        }
+    }
+
     private func executeListFiles() async -> String {
         print("🔧 list_files")
 
@@ -208,8 +225,11 @@ final class ChatViewModel {
         - write_file: create a new file or overwrite an existing one
         - read_file: read the full content of an existing file
         - list_files: list all files saved on the device
+        - delete_file: permanently delete a file from the device
 
-        When a user asks to edit or update an existing file, always call read_file first to get the current content, then write_file with the updated content. Be concise and helpful.
+        When a user asks to edit or update an existing file, always call read_file first to get the current content, then write_file with the updated content.
+        Only use delete_file when the user explicitly asks to delete or remove a file.
+        Be concise and helpful.
         """
     }
 }

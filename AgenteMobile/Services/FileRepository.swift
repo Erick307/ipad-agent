@@ -130,4 +130,15 @@ final class FileRepository {
             self.files.removeAll { $0.id == file.id }
         }
     }
+
+    func deleteFileByName(_ filename: String) async throws {
+        let filePath = documentDirectory.appendingPathComponent(filename)
+        guard FileManager.default.fileExists(atPath: filePath.path) else {
+            throw FileRepositoryError.fileNotFound(filename)
+        }
+        try FileManager.default.removeItem(at: filePath)
+        await MainActor.run {
+            self.files.removeAll { $0.name == filename }
+        }
+    }
 }

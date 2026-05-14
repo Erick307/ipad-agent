@@ -275,7 +275,8 @@ class ClaudeRepository {
             tools: [
                 writeFileToolDefinition(),
                 readFileToolDefinition(),
-                listFilesToolDefinition()
+                listFilesToolDefinition(),
+                deleteFileToolDefinition()
             ]
         )
 
@@ -340,6 +341,23 @@ class ClaudeRepository {
                     "filename": PropertySchema(
                         type: "string",
                         description: "Name of the file to read (e.g. 'shopping_list.md')."
+                    )
+                ],
+                required: ["filename"]
+            )
+        )
+    }
+
+    private func deleteFileToolDefinition() -> ToolDefinition {
+        ToolDefinition(
+            name: "delete_file",
+            description: "Permanently deletes a file from the device. Use only when the user explicitly asks to delete or remove a file. This action cannot be undone.",
+            input_schema: ToolInputSchema(
+                type: "object",
+                properties: [
+                    "filename": PropertySchema(
+                        type: "string",
+                        description: "Name of the file to delete (e.g. 'shopping_list.md')."
                     )
                 ],
                 required: ["filename"]
