@@ -31,6 +31,24 @@ final class ChatViewModel {
         loadSystemPrompt()
     }
 
+    // MARK: - Voice Input
+
+    var isRecording: Bool { speechRecognizer.isRecording }
+    var recognizedText: String { speechRecognizer.recognizedText }
+    var voiceError: String? { speechRecognizer.errorMessage }
+
+    func startVoiceInput() async {
+        await speechRecognizer.startRecording()
+    }
+
+    func stopVoiceInput() async {
+        await speechRecognizer.stopRecording()
+    }
+
+    func cancelVoiceInput() {
+        speechRecognizer.cancelRecording()
+    }
+
     // MARK: - Public Methods
 
     func sendMessage(_ text: String) async {

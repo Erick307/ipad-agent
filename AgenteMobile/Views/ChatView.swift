@@ -88,22 +88,68 @@ struct ChatView: View {
             }
 
             // Input area
-            VStack(spacing: 12) {
+            VStack(spacing: 8) {
+                // Voice error banner
+                if let voiceError = viewModel.voiceError {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(voiceError)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal)
+                }
+
                 HStack(spacing: 8) {
-                    TextField("Type a message...", text: $inputText)
-                        .textFieldStyle(.roundedBorder)
-                        .disabled(viewModel.isLoading)
+                    // Mic button
+                    Button(action: toggleRecording) {
+                        Image(systemName: viewModel.isRecording ? "mic.fill" : "mic")
+                            .font(.title2)
+                            .foregroundStyle(viewModel.isRecording ? .red : .secondary)
+                            .symbolEffect(.pulse, isActive: viewModel.isRecording)
+                    }
+                    .disabled(viewModel.isLoading)
+
+                    TextField(
+                        viewModel.isRecording ? "Listening…" : "Type a message…",
+                        text: $inputText
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(viewModel.isLoading || viewModel.isRecording)
 
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title2)
                             .foregroundStyle(.blue)
                     }
-                    .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isLoading)
+                    .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isLoading || viewModel.isRecording)
                 }
                 .padding()
                 .background(Color(.systemGray6))
             }
+        }
+        // Sync live transcription into the text field while recording
+        .onChange(of: viewModel.recognizedText) { _, text in
+            if viewModel.isRecording {
+                inputText = text
+            }
+        }
+        // When recording stops, keep the transcribed text in the field
+        // so the user can review and tap Send
+        .onChange(of: viewModel.isRecording) { _, isRecording in
+            if !isRecording && !viewModel.recognizedText.isEmpty {
+                inputText = viewModel.recognizedText
+            }
+        }
+    }
+
+    private func toggleRecording() {
+        if viewModel.isRecording {
+            Task { await viewModel.stopVoiceInput() }
+        } else {
+            inputText = ""
+            Task { await viewModel.startVoiceInput() }
         }
     }
 
