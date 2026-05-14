@@ -117,10 +117,6 @@ final class SpeechRecognizerService {
         }
         guard speechGranted else { return false }
 
-        return await withCheckedContinuation { continuation in
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                continuation.resume(returning: granted)
-            }
-        }
+        return await AVAudioApplication.requestRecordPermission()
     }
 }
