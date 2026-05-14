@@ -120,10 +120,8 @@ struct FileDetailView: View {
 
                 // Content
                 ScrollView {
-                    Text(file.content)
-                        .font(.system(.body, design: .monospaced))
+                    MarkdownView(text: file.content)
                         .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 // Actions
