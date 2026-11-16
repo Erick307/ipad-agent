@@ -15,6 +15,9 @@ final class ChatViewModel {
 
     private var systemPrompt: String = ""
 
+    /// Maximum number of API round-trips per user message, to stop runaway tool loops.
+    private static let maxAgentSteps = 10
+
     /// Separate message array formatted for the Anthropic API.
     /// Correctly preserves tool_use and tool_result blocks that the
     /// plain display `messages` array cannot represent.
@@ -68,9 +71,16 @@ final class ChatViewModel {
 
     // MARK: - Agentic Loop
 
-    private func agenticLoop() async {
+    private func agenticLoop(step: Int = 1) async {
         isLoading = true
         errorMessage = nil
+
+        guard step <= Self.maxAgentSteps else {
+            print("⛔ Agentic loop stopped: reached \(Self.maxAgentSteps) steps")
+            errorMessage = "Stopped after \(Self.maxAgentSteps) steps. Send another message to continue."
+            isLoading = false
+            return
+        }
 
         do {
             let response = try await claudeRepository.sendMessage(
@@ -116,7 +126,7 @@ final class ChatViewModel {
                 apiMessages.append(APIMessage(role: "user", blocks: toolResultBlocks))
 
                 // Loop so Claude can see the results
-                await agenticLoop()
+                await agenticLoop(step: step + 1)
                 return
             } else {
                 if !response.textContent.isEmpty {
