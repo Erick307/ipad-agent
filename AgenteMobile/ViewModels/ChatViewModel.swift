@@ -85,17 +85,35 @@ final class ChatViewModel {
 
                 appendAssistantMessage(response.textContent)
 
-                guard let toolCalls = response.toolCalls, !toolCalls.isEmpty else {
+                switch response.stopReason {
+                case "tool_use" where response.toolCalls?.isEmpty == false:
+                    let toolCalls = response.toolCalls ?? []
+                    print("🛠️  Step \(step): Claude called \(toolCalls.count) tool(s)")
+                    apiMessages.append(assistantTurn(text: response.textContent, toolCalls: toolCalls))
+                    apiMessages.append(await toolResultsTurn(for: toolCalls))
+                    // Next iteration sends the results back so Claude can see them
+
+                case "end_turn", "stop_sequence":
                     if !response.textContent.isEmpty {
                         apiMessages.append(APIMessage(role: "assistant", text: response.textContent))
                     }
                     return
-                }
 
-                print("🛠️  Step \(step): Claude called \(toolCalls.count) tool(s)")
-                apiMessages.append(assistantTurn(text: response.textContent, toolCalls: toolCalls))
-                apiMessages.append(await toolResultsTurn(for: toolCalls))
-                // Next iteration sends the results back so Claude can see them
+                case "max_tokens":
+                    // The response was cut off. A truncated tool_use input can still
+                    // parse as valid JSON (e.g. half a file), so never run its tools.
+                    errorMessage = "The response was cut off (max_tokens). Try a shorter request."
+                    return
+
+                case "refusal":
+                    errorMessage = "Claude declined to complete this request."
+                    return
+
+                default:
+                    print("⚠️ Unexpected stop reason: \(response.stopReason)")
+                    errorMessage = "Unexpected stop reason: \(response.stopReason)"
+                    return
+                }
 
             } catch {
                 errorMessage = "Failed to get response: \(error.localizedDescription)"
