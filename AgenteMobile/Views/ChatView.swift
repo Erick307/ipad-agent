@@ -3,18 +3,27 @@ import Observation
 
 struct ChatView: View {
     var viewModel: ChatViewModel
+    var onShowAPIKeySettings: () -> Void = {}
     @State private var inputText: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Chat")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                Text("Talk with Claude")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Chat")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    Text("Talk with Claude")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(action: onShowAPIKeySettings) {
+                    Image(systemName: "key")
+                        .font(.title3)
+                }
+                .accessibilityLabel("API Key Settings")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
@@ -220,7 +229,7 @@ extension View {
 
 #Preview {
     ChatView(viewModel: ChatViewModel(
-        claudeRepository: ClaudeRepository(),
+        claudeRepository: ClaudeRepository(apiKeyStore: APIKeyStore()),
         fileRepository: FileRepository(),
         speechRecognizer: SpeechRecognizerService()
     ))

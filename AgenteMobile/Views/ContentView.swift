@@ -4,9 +4,12 @@ import Observation
 struct ContentView: View {
     @State private var chatViewModel: ChatViewModel
     @State private var fileRepository: FileRepository
+    @State private var apiKeyStore: APIKeyStore
+    @State private var showAPIKeySettings: Bool
 
     init() {
-        let claudeRepository = ClaudeRepository()
+        let apiKeyStore = APIKeyStore()
+        let claudeRepository = ClaudeRepository(apiKeyStore: apiKeyStore)
         let fileRepository = FileRepository()
         let speechRecognizer = SpeechRecognizerService()
 
@@ -18,13 +21,18 @@ struct ContentView: View {
 
         _chatViewModel = State(initialValue: chatViewModel)
         _fileRepository = State(initialValue: fileRepository)
+        _apiKeyStore = State(initialValue: apiKeyStore)
+        // Ask for a key on first launch
+        _showAPIKeySettings = State(initialValue: !apiKeyStore.hasKey)
     }
 
     var body: some View {
         HStack(spacing: 0) {
             // Chat View (40%)
-            ChatView(viewModel: chatViewModel)
-                .frame(maxWidth: .infinity)
+            ChatView(viewModel: chatViewModel) {
+                showAPIKeySettings = true
+            }
+            .frame(maxWidth: .infinity)
 
             Divider()
 
@@ -33,6 +41,9 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity)
         }
         .background(Color(.systemBackground))
+        .sheet(isPresented: $showAPIKeySettings) {
+            APIKeySettingsView(apiKeyStore: apiKeyStore)
+        }
     }
 }
 

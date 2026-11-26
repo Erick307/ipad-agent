@@ -31,5 +31,5 @@ Podfile.lock
 .env
 .env.local
 
-# API Keys (NEVER commit these!)
-Constants.swift
+# API keys live in the Keychain (entered in the app) or in .env for local
+# runs. .githooks/pre-commit blocks any commit that contains one.

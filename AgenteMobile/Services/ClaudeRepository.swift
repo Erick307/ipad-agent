@@ -240,13 +240,12 @@ private struct APIResponse: Decodable {
 // MARK: - ClaudeRepository
 
 class ClaudeRepository {
-    private let apiKey: String
+    private let apiKeyStore: APIKeyStore
     private let apiBaseURL: String
     private let model: String
     private let maxTokens: Int
 
     /// Room for write_file inputs that carry a whole file plus adaptive thinking.
-    /// Lives here rather than in the gitignored Constants.swift so it is versioned.
     private static let defaultMaxTokens = 16_000
 
     /// Simple file read/write tasks don't need deep thinking; low keeps it cheap and fast.
@@ -255,12 +254,8 @@ class ClaudeRepository {
     /// Thinking adds time to every turn, so allow longer than URLSession's 60s default.
     private static let requestTimeout: TimeInterval = 600
 
-    init(apiKey: String = "") {
-        if !apiKey.isEmpty {
-            self.apiKey = apiKey
-        } else {
-            self.apiKey = Self.loadAPIKey()
-        }
+    init(apiKeyStore: APIKeyStore) {
+        self.apiKeyStore = apiKeyStore
         self.apiBaseURL = AppConstants.ANTHROPIC_BASE_URL
         self.model = AppConstants.MODEL
         self.maxTokens = Self.defaultMaxTokens
@@ -391,6 +386,11 @@ class ClaudeRepository {
     // MARK: - Private Methods
 
     private func callClaudeAPI(_ request: MessageRequest) async throws -> APIResponse {
+        // Read on every request so a key saved in settings applies immediately
+        guard let apiKey = apiKeyStore.currentKey else {
+            throw ClaudeAPIError.missingAPIKey
+        }
+
         let url = URL(string: "\(apiBaseURL)/messages")!
 
         var urlRequest = URLRequest(url: url)
@@ -421,26 +421,20 @@ class ClaudeRepository {
         print("✅ API Response received")
         return try JSONDecoder().decode(APIResponse.self, from: data)
     }
-
-    private static func loadAPIKey() -> String {
-        let key = AppConstants.ANTHROPIC_API_KEY
-        guard !key.isEmpty && key != "sk-ant-" else {
-            print("⚠️ Warning: No API key configured.")
-            return ""
-        }
-        return key
-    }
 }
 
 // MARK: - Error Types
 
 enum ClaudeAPIError: LocalizedError {
+    case missingAPIKey
     case invalidResponse
     case apiError(statusCode: Int, message: String)
     case decodingError(String)
 
     var errorDescription: String? {
         switch self {
+        case .missingAPIKey:
+            return "No API key set. Tap the key icon to add one."
         case .invalidResponse:
             return "Invalid response from API"
         case .apiError(let code, let message):
