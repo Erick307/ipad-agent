@@ -192,10 +192,21 @@ private struct MessageRequest: Encodable {
     let system: String
     let messages: [APIMessage]
     let tools: [ToolDefinition]?
+    let thinking: ThinkingConfig
+    let output_config: OutputConfig
 
     enum CodingKeys: String, CodingKey {
-        case model, max_tokens, system, messages, tools
+        case model, max_tokens, system, messages, tools, thinking, output_config
     }
+}
+
+private struct ThinkingConfig: Encodable {
+    let type: String
+}
+
+private struct OutputConfig: Encodable {
+    /// low | medium | high | xhigh | max. Defaults to medium when omitted.
+    let effort: String
 }
 
 private struct ToolDefinition: Encodable {
@@ -238,6 +249,12 @@ class ClaudeRepository {
     /// Lives here rather than in the gitignored Constants.swift so it is versioned.
     private static let defaultMaxTokens = 16_000
 
+    /// Simple file read/write tasks don't need deep thinking; low keeps it cheap and fast.
+    private static let defaultEffort = "low"
+
+    /// Thinking adds time to every turn, so allow longer than URLSession's 60s default.
+    private static let requestTimeout: TimeInterval = 600
+
     init(apiKey: String = "") {
         if !apiKey.isEmpty {
             self.apiKey = apiKey
@@ -265,7 +282,9 @@ class ClaudeRepository {
                 readFileToolDefinition(),
                 listFilesToolDefinition(),
                 deleteFileToolDefinition()
-            ]
+            ],
+            thinking: ThinkingConfig(type: "adaptive"),
+            output_config: OutputConfig(effort: Self.defaultEffort)
         )
 
         let response = try await callClaudeAPI(request)
@@ -379,6 +398,7 @@ class ClaudeRepository {
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         urlRequest.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        urlRequest.timeoutInterval = Self.requestTimeout
 
         urlRequest.httpBody = try JSONEncoder().encode(request)
 
