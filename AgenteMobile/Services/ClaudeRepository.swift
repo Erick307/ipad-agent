@@ -142,9 +142,11 @@ struct APIToolResultBlock: Encodable {
     let type: String = "tool_result"
     let tool_use_id: String
     let content: String
+    /// Tells Claude the tool failed and `content` holds the error message.
+    let is_error: Bool
 
     enum CodingKeys: String, CodingKey {
-        case type, tool_use_id, content
+        case type, tool_use_id, content, is_error
     }
 }
 

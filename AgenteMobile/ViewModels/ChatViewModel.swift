@@ -157,10 +157,11 @@ final class ChatViewModel {
     private func toolResultsTurn(for toolCalls: [ToolCall]) async -> APIMessage {
         var blocks: [AnyEncodable] = []
         for toolCall in toolCalls {
-            let result = await executeToolCall(toolCall)
+            let output = await executeToolCall(toolCall)
             blocks.append(AnyEncodable(APIToolResultBlock(
                 tool_use_id: toolCall.id,
-                content: result
+                content: output.content,
+                is_error: output.isError
             )))
         }
         return APIMessage(role: "user", blocks: blocks)
@@ -168,7 +169,17 @@ final class ChatViewModel {
 
     // MARK: - Tool Execution
 
-    private func executeToolCall(_ toolCall: ToolCall) async -> String {
+    /// Result of running a tool. Failures are still sent back to Claude (flagged
+    /// with `is_error`) so it can retry or explain, instead of breaking the loop.
+    private struct ToolOutput {
+        let content: String
+        let isError: Bool
+
+        static func success(_ content: String) -> ToolOutput { ToolOutput(content: content, isError: false) }
+        static func failure(_ content: String) -> ToolOutput { ToolOutput(content: content, isError: true) }
+    }
+
+    private func executeToolCall(_ toolCall: ToolCall) async -> ToolOutput {
         switch toolCall.name {
         case "write_file":  return await executeWriteFile(toolCall)
         case "read_file":   return await executeReadFile(toolCall)
@@ -176,74 +187,74 @@ final class ChatViewModel {
         case "delete_file": return await executeDeleteFile(toolCall)
         default:
             print("⚠️ Unknown tool: \(toolCall.name)")
-            return "Error: Unknown tool '\(toolCall.name)'"
+            return .failure("Error: Unknown tool '\(toolCall.name)'")
         }
     }
 
-    private func executeWriteFile(_ toolCall: ToolCall) async -> String {
+    private func executeWriteFile(_ toolCall: ToolCall) async -> ToolOutput {
         let filename = toolCall.input["filename"]?.stringValue ?? ""
         let content  = toolCall.input["content"]?.stringValue  ?? ""
 
-        guard !filename.isEmpty else { return "Error: filename is required" }
+        guard !filename.isEmpty else { return .failure("Error: filename is required") }
 
         print("🔧 write_file: \(filename) (\(content.count) bytes)")
 
         do {
             let file = try await fileRepository.writeFile(filename: filename, content: content)
             print("✅ File written: \(file.name)")
-            return "File '\(filename)' saved successfully. Size: \(file.sizeInKB)"
+            return .success("File '\(filename)' saved successfully. Size: \(file.sizeInKB)")
         } catch {
             print("❌ write_file error: \(error)")
-            return "Error writing '\(filename)': \(error.localizedDescription)"
+            return .failure("Error writing '\(filename)': \(error.localizedDescription)")
         }
     }
 
-    private func executeReadFile(_ toolCall: ToolCall) async -> String {
+    private func executeReadFile(_ toolCall: ToolCall) async -> ToolOutput {
         let filename = toolCall.input["filename"]?.stringValue ?? ""
 
-        guard !filename.isEmpty else { return "Error: filename is required" }
+        guard !filename.isEmpty else { return .failure("Error: filename is required") }
 
         print("🔧 read_file: \(filename)")
 
         do {
             let content = try await fileRepository.readFileByName(filename)
             print("✅ File read: \(filename)")
-            return content
+            return .success(content)
         } catch {
             print("❌ read_file error: \(error)")
-            return "Error reading '\(filename)': \(error.localizedDescription)"
+            return .failure("Error reading '\(filename)': \(error.localizedDescription)")
         }
     }
 
-    private func executeDeleteFile(_ toolCall: ToolCall) async -> String {
+    private func executeDeleteFile(_ toolCall: ToolCall) async -> ToolOutput {
         let filename = toolCall.input["filename"]?.stringValue ?? ""
-        guard !filename.isEmpty else { return "Error: filename is required" }
+        guard !filename.isEmpty else { return .failure("Error: filename is required") }
 
         print("🔧 delete_file: \(filename)")
 
         do {
             try await fileRepository.deleteFileByName(filename)
             print("✅ File deleted: \(filename)")
-            return "File '\(filename)' deleted successfully."
+            return .success("File '\(filename)' deleted successfully.")
         } catch {
             print("❌ delete_file error: \(error)")
-            return "Error deleting '\(filename)': \(error.localizedDescription)"
+            return .failure("Error deleting '\(filename)': \(error.localizedDescription)")
         }
     }
 
-    private func executeListFiles() async -> String {
+    private func executeListFiles() async -> ToolOutput {
         print("🔧 list_files")
 
         do {
             let files = try await fileRepository.listFiles()
             if files.isEmpty {
-                return "No files found on device."
+                return .success("No files found on device.")
             }
             let lines = files.map { "- \($0.name) (\($0.sizeInKB))" }
-            return "Files on device (\(files.count)):\n" + lines.joined(separator: "\n")
+            return .success("Files on device (\(files.count)):\n" + lines.joined(separator: "\n"))
         } catch {
             print("❌ list_files error: \(error)")
-            return "Error listing files: \(error.localizedDescription)"
+            return .failure("Error listing files: \(error.localizedDescription)")
         }
     }
 
