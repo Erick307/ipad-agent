@@ -116,26 +116,16 @@ struct ToolCall {
 
 struct ClaudeResponse {
     let id: String
+    /// All `text` blocks joined, for display.
     let textContent: String
     let toolCalls: [ToolCall]?
     let stopReason: String
+    /// Every content block exactly as returned (text, tool_use, thinking, ...).
+    /// Append this to the history unchanged so no block is lost between turns.
+    let content: [JSONValue]
 }
 
 // MARK: - API Message Content Types (internal, used by ChatViewModel)
-
-/// A plain text content block for the assistant turn.
-struct APITextBlock: Encodable {
-    let type: String = "text"
-    let text: String
-}
-
-/// A `tool_use` content block produced by the assistant.
-struct APIToolUseBlock: Encodable {
-    let type: String = "tool_use"
-    let id: String
-    let name: String
-    let input: [String: JSONValue]
-}
 
 /// A `tool_result` content block sent back in the user turn.
 struct APIToolResultBlock: Encodable {
@@ -231,17 +221,9 @@ private struct PropertySchema: Encodable {
 
 private struct APIResponse: Decodable {
     let id: String
-    let content: [ResponseContentBlock]
+    /// Decoded as raw JSON so blocks round-trip into the history unchanged.
+    let content: [JSONValue]
     let stop_reason: String
-}
-
-/// A content block returned by the Anthropic API.
-private struct ResponseContentBlock: Decodable {
-    let type: String
-    let text: String?
-    let id: String?
-    let name: String?
-    let input: [String: JSONValue]?
 }
 
 // MARK: - ClaudeRepository
@@ -284,16 +266,19 @@ class ClaudeRepository {
 
         let response = try await callClaudeAPI(request)
 
-        let textContent = response.content
-            .first(where: { $0.type == "text" })?
-            .text ?? ""
+        let blocks = response.content.compactMap { $0.objectValue }
 
-        let toolCalls: [ToolCall] = response.content
-            .filter { $0.type == "tool_use" }
+        let textContent = blocks
+            .filter { $0["type"]?.stringValue == "text" }
+            .compactMap { $0["text"]?.stringValue }
+            .joined(separator: "\n\n")
+
+        let toolCalls: [ToolCall] = blocks
+            .filter { $0["type"]?.stringValue == "tool_use" }
             .compactMap { block in
-                guard let toolId = block.id,
-                      let toolName = block.name,
-                      let inputDict = block.input else { return nil }
+                guard let toolId = block["id"]?.stringValue,
+                      let toolName = block["name"]?.stringValue,
+                      let inputDict = block["input"]?.objectValue else { return nil }
                 return ToolCall(id: toolId, name: toolName, input: inputDict)
             }
 
@@ -306,7 +291,8 @@ class ClaudeRepository {
             id: response.id,
             textContent: textContent,
             toolCalls: toolCalls.isEmpty ? nil : toolCalls,
-            stopReason: response.stop_reason
+            stopReason: response.stop_reason,
+            content: response.content
         )
     }
 

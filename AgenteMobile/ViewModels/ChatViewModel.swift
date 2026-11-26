@@ -89,13 +89,14 @@ final class ChatViewModel {
                 case "tool_use" where response.toolCalls?.isEmpty == false:
                     let toolCalls = response.toolCalls ?? []
                     print("🛠️  Step \(step): Claude called \(toolCalls.count) tool(s)")
-                    apiMessages.append(assistantTurn(text: response.textContent, toolCalls: toolCalls))
+                    apiMessages.append(assistantTurn(response))
                     apiMessages.append(await toolResultsTurn(for: toolCalls))
                     // Next iteration sends the results back so Claude can see them
 
                 case "end_turn", "stop_sequence":
-                    if !response.textContent.isEmpty {
-                        apiMessages.append(APIMessage(role: "assistant", text: response.textContent))
+                    // An empty assistant turn would be rejected on the next request
+                    if !response.content.isEmpty {
+                        apiMessages.append(assistantTurn(response))
                     }
                     return
 
@@ -136,21 +137,10 @@ final class ChatViewModel {
         ))
     }
 
-    /// Full assistant turn (text + tool_use blocks). The API requires it in the
-    /// history before the user turn that carries the matching tool_result blocks.
-    private func assistantTurn(text: String, toolCalls: [ToolCall]) -> APIMessage {
-        var blocks: [AnyEncodable] = []
-        if !text.isEmpty {
-            blocks.append(AnyEncodable(APITextBlock(text: text)))
-        }
-        for toolCall in toolCalls {
-            blocks.append(AnyEncodable(APIToolUseBlock(
-                id: toolCall.id,
-                name: toolCall.name,
-                input: toolCall.input
-            )))
-        }
-        return APIMessage(role: "assistant", blocks: blocks)
+    /// The assistant turn exactly as the API returned it (text, tool_use, thinking...).
+    /// The tool_use blocks must be in the history before the matching tool_result blocks.
+    private func assistantTurn(_ response: ClaudeResponse) -> APIMessage {
+        APIMessage(role: "assistant", blocks: response.content.map(AnyEncodable.init))
     }
 
     /// Executes every tool call and returns all results in a single user turn.
