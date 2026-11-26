@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Blocks commits that contain an Anthropic API key.
+# Enable once per clone:  git config core.hooksPath .githooks
+
+pattern='sk-ant-[A-Za-z0-9]+-[A-Za-z0-9_-]{20,}'
+
+matches=$(git diff --cached --diff-filter=ACMR -U0 | grep -E '^\+' | grep -nE "$pattern")
+
+if [ -n "$matches" ]; then
+    echo "pre-commit: an Anthropic API key is staged. Commit blocked." >&2
+    echo "Files:" >&2
+    git diff --cached --name-only --diff-filter=ACMR -z \
+        | xargs -0 grep -lE "$pattern" 2>/dev/null | sed 's/^/  /' >&2
+    echo "Keep the key in the app's Keychain or in .env, never in tracked files." >&2
+    exit 1
+fi

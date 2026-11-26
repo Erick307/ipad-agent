@@ -1,6 +1,7 @@
 class DependencyContainer {
     
-    let claudeRepository =  ClaudeRepository()
+    let apiKeyStore = APIKeyStore()
+    lazy var claudeRepository = ClaudeRepository(apiKeyStore: apiKeyStore)
     let fileRepository = FileRepository()
     let speechRecognizer = SpeechRecognizerService()
     
