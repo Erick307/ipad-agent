@@ -234,6 +234,10 @@ class ClaudeRepository {
     private let model: String
     private let maxTokens: Int
 
+    /// Room for write_file inputs that carry a whole file plus adaptive thinking.
+    /// Lives here rather than in the gitignored Constants.swift so it is versioned.
+    private static let defaultMaxTokens = 16_000
+
     init(apiKey: String = "") {
         if !apiKey.isEmpty {
             self.apiKey = apiKey
@@ -242,7 +246,7 @@ class ClaudeRepository {
         }
         self.apiBaseURL = AppConstants.ANTHROPIC_BASE_URL
         self.model = AppConstants.MODEL
-        self.maxTokens = AppConstants.MAX_TOKENS
+        self.maxTokens = Self.defaultMaxTokens
     }
 
     // MARK: - Public Methods
