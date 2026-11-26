@@ -71,77 +71,81 @@ final class ChatViewModel {
 
     // MARK: - Agentic Loop
 
-    private func agenticLoop(step: Int = 1) async {
+    private func agenticLoop() async {
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
-        guard step <= Self.maxAgentSteps else {
-            print("⛔ Agentic loop stopped: reached \(Self.maxAgentSteps) steps")
-            errorMessage = "Stopped after \(Self.maxAgentSteps) steps. Send another message to continue."
-            isLoading = false
-            return
-        }
+        for step in 1...Self.maxAgentSteps {
+            do {
+                let response = try await claudeRepository.sendMessage(
+                    apiMessages: apiMessages,
+                    systemPrompt: systemPrompt
+                )
 
-        do {
-            let response = try await claudeRepository.sendMessage(
-                apiMessages: apiMessages,
-                systemPrompt: systemPrompt
-            )
+                appendAssistantMessage(response.textContent)
 
-            if !response.textContent.isEmpty {
-                messages.append(Message(
-                    id: UUID(),
-                    role: "assistant",
-                    content: response.textContent,
-                    timestamp: Date()
-                ))
-            }
-
-            if let toolCalls = response.toolCalls, !toolCalls.isEmpty {
-                print("🛠️  Claude called \(toolCalls.count) tool(s)")
-
-                // Add full assistant turn (text + tool_use blocks) to apiMessages
-                var assistantBlocks: [AnyEncodable] = []
-                if !response.textContent.isEmpty {
-                    assistantBlocks.append(AnyEncodable(APITextBlock(text: response.textContent)))
+                guard let toolCalls = response.toolCalls, !toolCalls.isEmpty else {
+                    if !response.textContent.isEmpty {
+                        apiMessages.append(APIMessage(role: "assistant", text: response.textContent))
+                    }
+                    return
                 }
-                for toolCall in toolCalls {
-                    assistantBlocks.append(AnyEncodable(APIToolUseBlock(
-                        id: toolCall.id,
-                        name: toolCall.name,
-                        input: toolCall.input
-                    )))
-                }
-                apiMessages.append(APIMessage(role: "assistant", blocks: assistantBlocks))
 
-                // Execute tools and collect results as tool_result blocks
-                var toolResultBlocks: [AnyEncodable] = []
-                for toolCall in toolCalls {
-                    let result = await executeToolCall(toolCall)
-                    toolResultBlocks.append(AnyEncodable(APIToolResultBlock(
-                        tool_use_id: toolCall.id,
-                        content: result
-                    )))
-                }
-                apiMessages.append(APIMessage(role: "user", blocks: toolResultBlocks))
+                print("🛠️  Step \(step): Claude called \(toolCalls.count) tool(s)")
+                apiMessages.append(assistantTurn(text: response.textContent, toolCalls: toolCalls))
+                apiMessages.append(await toolResultsTurn(for: toolCalls))
+                // Next iteration sends the results back so Claude can see them
 
-                // Loop so Claude can see the results
-                await agenticLoop(step: step + 1)
+            } catch {
+                errorMessage = "Failed to get response: \(error.localizedDescription)"
+                print("❌ Agentic loop error: \(error)")
                 return
-            } else {
-                if !response.textContent.isEmpty {
-                    apiMessages.append(APIMessage(role: "assistant", text: response.textContent))
-                }
             }
-
-            errorMessage = nil
-
-        } catch {
-            errorMessage = "Failed to get response: \(error.localizedDescription)"
-            print("❌ Agentic loop error: \(error)")
         }
 
-        isLoading = false
+        print("⛔ Agentic loop stopped: reached \(Self.maxAgentSteps) steps")
+        errorMessage = "Stopped after \(Self.maxAgentSteps) steps. Send another message to continue."
+    }
+
+    private func appendAssistantMessage(_ text: String) {
+        guard !text.isEmpty else { return }
+        messages.append(Message(
+            id: UUID(),
+            role: "assistant",
+            content: text,
+            timestamp: Date()
+        ))
+    }
+
+    /// Full assistant turn (text + tool_use blocks). The API requires it in the
+    /// history before the user turn that carries the matching tool_result blocks.
+    private func assistantTurn(text: String, toolCalls: [ToolCall]) -> APIMessage {
+        var blocks: [AnyEncodable] = []
+        if !text.isEmpty {
+            blocks.append(AnyEncodable(APITextBlock(text: text)))
+        }
+        for toolCall in toolCalls {
+            blocks.append(AnyEncodable(APIToolUseBlock(
+                id: toolCall.id,
+                name: toolCall.name,
+                input: toolCall.input
+            )))
+        }
+        return APIMessage(role: "assistant", blocks: blocks)
+    }
+
+    /// Executes every tool call and returns all results in a single user turn.
+    private func toolResultsTurn(for toolCalls: [ToolCall]) async -> APIMessage {
+        var blocks: [AnyEncodable] = []
+        for toolCall in toolCalls {
+            let result = await executeToolCall(toolCall)
+            blocks.append(AnyEncodable(APIToolResultBlock(
+                tool_use_id: toolCall.id,
+                content: result
+            )))
+        }
+        return APIMessage(role: "user", blocks: blocks)
     }
 
     // MARK: - Tool Execution
