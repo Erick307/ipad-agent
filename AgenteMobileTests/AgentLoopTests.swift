@@ -142,4 +142,20 @@ struct AgentLoopTests {
         #expect(repository.requests[1].messages.count == 3)
         #expect(agent.history.count == 4)
     }
+
+    @Test func messageSentWhileRunningIsRejected() async throws {
+        let (agent, repository) = makeAgent([.text("Hi!"), .text("Free again.")])
+
+        let first = agent.send("Hello")
+        let (_, error) = await run(agent, "Me too")
+        #expect(error as? AgentError == .alreadyRunning)
+
+        for try await _ in first {}
+        #expect(repository.requests.count == 1)
+        #expect(agent.history.count == 2)
+
+        // Once the first message finishes, the loop takes new ones again
+        let (_, nextError) = await run(agent, "Again")
+        #expect(nextError == nil)
+    }
 }

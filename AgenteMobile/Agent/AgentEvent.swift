@@ -19,6 +19,7 @@ enum AgentError: LocalizedError, Equatable {
     case refusal
     case stepLimitReached(Int)
     case unexpectedStop(String)
+    case alreadyRunning
 
     var errorDescription: String? {
         switch self {
@@ -30,6 +31,8 @@ enum AgentError: LocalizedError, Equatable {
             return "Stopped after \(steps) steps. Send another message to continue."
         case .unexpectedStop(let reason):
             return "Unexpected stop reason: \(reason)"
+        case .alreadyRunning:
+            return "Claude is still working on the previous message."
         }
     }
 }
