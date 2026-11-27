@@ -22,7 +22,7 @@ struct ToolInput {
     }
 }
 
-enum ToolInputError: LocalizedError {
+enum ToolInputError: LocalizedError, Equatable {
     case missingParameter(String)
 
     var errorDescription: String? {
