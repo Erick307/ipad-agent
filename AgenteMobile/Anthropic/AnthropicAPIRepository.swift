@@ -50,6 +50,10 @@ final class AnthropicAPIRepository: AnthropicRepository {
     /// Simple file read/write tasks don't need deep thinking; low keeps it cheap and fast.
     private static let defaultEffort = "low"
 
+    /// 2026-10-21 rejects `temperature`, `top_p`, `top_k`, documents in assistant turns and
+    /// citations in user turns. This app sends none of them, so nothing else had to change.
+    private static let apiVersion = "2026-10-21"
+
     /// Thinking adds time to every turn, so allow longer than URLSession's 60s default.
     private static let requestTimeout: TimeInterval = 600
 
@@ -122,7 +126,7 @@ final class AnthropicAPIRepository: AnthropicRepository {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        urlRequest.setValue(Self.apiVersion, forHTTPHeaderField: "anthropic-version")
         urlRequest.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         urlRequest.timeoutInterval = Self.requestTimeout
 

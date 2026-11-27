@@ -10,6 +10,11 @@ import Foundation
 ///
 /// It knows nothing about the UI or about files. It gets the API and the tools
 /// injected, so tests can drive it with a scripted repository and fake tools.
+///
+/// Main actor, like its only caller: the work is all awaiting the network and
+/// the tools, so nothing blocks the main thread, and `history` has one owner.
+/// The target already defaults to it; spelling it out keeps that visible here.
+@MainActor
 final class AgentLoop {
     private let repository: AnthropicRepository
     private let tools: [String: AgentTool]
@@ -20,6 +25,10 @@ final class AgentLoop {
     /// The conversation in API format. Unlike the chat shown on screen, it keeps
     /// every tool_use and tool_result block, which Claude needs on the next request.
     private(set) var history: [APIMessage] = []
+
+    /// The main actor doesn't stop a second send from interleaving its turns with
+    /// the first at every await, so only one message runs at a time.
+    private var isRunning = false
 
     /// - Parameter maxSteps: Maximum API round-trips per user message, to stop runaway tool loops.
     init(
@@ -39,7 +48,15 @@ final class AgentLoop {
     /// The stream throws an `AgentError` if the loop stops early.
     func send(_ text: String) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
+            // Checked and set before the task starts, so back-to-back sends can't both pass
+            guard !isRunning else {
+                continuation.finish(throwing: AgentError.alreadyRunning)
+                return
+            }
+            isRunning = true
+
             let task = Task {
+                defer { isRunning = false }
                 do {
                     try await run(text) { continuation.yield($0) }
                     continuation.finish()
