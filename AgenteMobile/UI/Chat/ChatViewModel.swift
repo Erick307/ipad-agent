@@ -9,8 +9,9 @@ final class ChatViewModel {
     var errorMessage: String? = nil
     var conversationId: String = UUID().uuidString
 
-    private let claudeRepository: ClaudeRepository
-    private let fileRepository: FileRepository
+    private let repository: AnthropicRepository
+    private let tools: [String: AgentTool]
+    private let toolDefinitions: [ToolDefinition]
     private let speechRecognizer: SpeechRecognizerService
 
     private var systemPrompt: String = ""
@@ -24,12 +25,13 @@ final class ChatViewModel {
     private var apiMessages: [APIMessage] = []
 
     init(
-        claudeRepository: ClaudeRepository,
-        fileRepository: FileRepository,
+        repository: AnthropicRepository,
+        tools: [AgentTool],
         speechRecognizer: SpeechRecognizerService
     ) {
-        self.claudeRepository = claudeRepository
-        self.fileRepository = fileRepository
+        self.repository = repository
+        self.tools = Dictionary(uniqueKeysWithValues: tools.map { ($0.name, $0) })
+        self.toolDefinitions = tools.map(\.definition)
         self.speechRecognizer = speechRecognizer
         loadSystemPrompt()
     }
@@ -78,16 +80,17 @@ final class ChatViewModel {
 
         for step in 1...Self.maxAgentSteps {
             do {
-                let response = try await claudeRepository.sendMessage(
-                    apiMessages: apiMessages,
-                    systemPrompt: systemPrompt
+                let response = try await repository.sendMessage(
+                    messages: apiMessages,
+                    system: systemPrompt,
+                    tools: toolDefinitions
                 )
 
                 appendAssistantMessage(response.textContent)
 
                 switch response.stopReason {
-                case "tool_use" where response.toolCalls?.isEmpty == false:
-                    let toolCalls = response.toolCalls ?? []
+                case "tool_use" where !response.toolCalls.isEmpty:
+                    let toolCalls = response.toolCalls
                     print("🛠️  Step \(step): Claude called \(toolCalls.count) tool(s)")
                     apiMessages.append(assistantTurn(response))
                     apiMessages.append(await toolResultsTurn(for: toolCalls))
@@ -170,81 +173,15 @@ final class ChatViewModel {
     }
 
     private func executeToolCall(_ toolCall: ToolCall) async -> ToolOutput {
-        switch toolCall.name {
-        case "write_file":  return await executeWriteFile(toolCall)
-        case "read_file":   return await executeReadFile(toolCall)
-        case "list_files":  return await executeListFiles()
-        case "delete_file": return await executeDeleteFile(toolCall)
-        default:
+        guard let tool = tools[toolCall.name] else {
             print("⚠️ Unknown tool: \(toolCall.name)")
             return .failure("Error: Unknown tool '\(toolCall.name)'")
         }
-    }
-
-    private func executeWriteFile(_ toolCall: ToolCall) async -> ToolOutput {
-        let filename = toolCall.input["filename"]?.stringValue ?? ""
-        let content  = toolCall.input["content"]?.stringValue  ?? ""
-
-        guard !filename.isEmpty else { return .failure("Error: filename is required") }
-
-        print("🔧 write_file: \(filename) (\(content.count) bytes)")
-
         do {
-            let file = try await fileRepository.writeFile(filename: filename, content: content)
-            print("✅ File written: \(file.name)")
-            return .success("File '\(filename)' saved successfully. Size: \(file.sizeInKB)")
+            return .success(try await tool.execute(ToolInput(toolCall.input)))
         } catch {
-            print("❌ write_file error: \(error)")
-            return .failure("Error writing '\(filename)': \(error.localizedDescription)")
-        }
-    }
-
-    private func executeReadFile(_ toolCall: ToolCall) async -> ToolOutput {
-        let filename = toolCall.input["filename"]?.stringValue ?? ""
-
-        guard !filename.isEmpty else { return .failure("Error: filename is required") }
-
-        print("🔧 read_file: \(filename)")
-
-        do {
-            let content = try await fileRepository.readFileByName(filename)
-            print("✅ File read: \(filename)")
-            return .success(content)
-        } catch {
-            print("❌ read_file error: \(error)")
-            return .failure("Error reading '\(filename)': \(error.localizedDescription)")
-        }
-    }
-
-    private func executeDeleteFile(_ toolCall: ToolCall) async -> ToolOutput {
-        let filename = toolCall.input["filename"]?.stringValue ?? ""
-        guard !filename.isEmpty else { return .failure("Error: filename is required") }
-
-        print("🔧 delete_file: \(filename)")
-
-        do {
-            try await fileRepository.deleteFileByName(filename)
-            print("✅ File deleted: \(filename)")
-            return .success("File '\(filename)' deleted successfully.")
-        } catch {
-            print("❌ delete_file error: \(error)")
-            return .failure("Error deleting '\(filename)': \(error.localizedDescription)")
-        }
-    }
-
-    private func executeListFiles() async -> ToolOutput {
-        print("🔧 list_files")
-
-        do {
-            let files = try await fileRepository.listFiles()
-            if files.isEmpty {
-                return .success("No files found on device.")
-            }
-            let lines = files.map { "- \($0.name) (\($0.sizeInKB))" }
-            return .success("Files on device (\(files.count)):\n" + lines.joined(separator: "\n"))
-        } catch {
-            print("❌ list_files error: \(error)")
-            return .failure("Error listing files: \(error.localizedDescription)")
+            print("❌ \(toolCall.name) error: \(error)")
+            return .failure("Error: \(error.localizedDescription)")
         }
     }
 

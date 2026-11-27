@@ -9,13 +9,17 @@ struct ContentView: View {
 
     init() {
         let apiKeyStore = APIKeyStore()
-        let claudeRepository = ClaudeRepository(apiKeyStore: apiKeyStore)
         let fileRepository = FileRepository()
         let speechRecognizer = SpeechRecognizerService()
 
         let chatViewModel = ChatViewModel(
-            claudeRepository: claudeRepository,
-            fileRepository: fileRepository,
+            repository: AnthropicAPIRepository(apiKeyStore: apiKeyStore),
+            tools: [
+                WriteFileTool(fileRepository: fileRepository),
+                ReadFileTool(fileRepository: fileRepository),
+                ListFilesTool(fileRepository: fileRepository),
+                DeleteFileTool(fileRepository: fileRepository)
+            ],
             speechRecognizer: speechRecognizer
         )
 

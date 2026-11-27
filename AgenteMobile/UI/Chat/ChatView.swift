@@ -228,9 +228,5 @@ extension View {
 }
 
 #Preview {
-    ChatView(viewModel: ChatViewModel(
-        claudeRepository: ClaudeRepository(apiKeyStore: APIKeyStore()),
-        fileRepository: FileRepository(),
-        speechRecognizer: SpeechRecognizerService()
-    ))
+    ChatView(viewModel: DependencyContainer().makeChatViewModel())
 }

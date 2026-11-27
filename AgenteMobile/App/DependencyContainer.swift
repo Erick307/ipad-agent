@@ -1,11 +1,19 @@
 class DependencyContainer {
     
     let apiKeyStore = APIKeyStore()
-    lazy var claudeRepository = ClaudeRepository(apiKeyStore: apiKeyStore)
     let fileRepository = FileRepository()
     let speechRecognizer = SpeechRecognizerService()
     
     func makeChatViewModel() -> ChatViewModel {
-        return ChatViewModel(claudeRepository: claudeRepository, fileRepository: fileRepository, speechRecognizer: speechRecognizer)
+        return ChatViewModel(
+            repository: AnthropicAPIRepository(apiKeyStore: apiKeyStore),
+            tools: [
+                WriteFileTool(fileRepository: fileRepository),
+                ReadFileTool(fileRepository: fileRepository),
+                ListFilesTool(fileRepository: fileRepository),
+                DeleteFileTool(fileRepository: fileRepository)
+            ],
+            speechRecognizer: speechRecognizer
+        )
     }
 }
