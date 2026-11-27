@@ -228,5 +228,5 @@ extension View {
 }
 
 #Preview {
-    ChatView(viewModel: DependencyContainer().makeChatViewModel())
+    ChatView(viewModel: AppContainer().makeChatViewModel())
 }

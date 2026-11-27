@@ -7,27 +7,12 @@ struct ContentView: View {
     @State private var apiKeyStore: APIKeyStore
     @State private var showAPIKeySettings: Bool
 
-    init() {
-        let apiKeyStore = APIKeyStore()
-        let fileRepository = FileRepository()
-        let speechRecognizer = SpeechRecognizerService()
-
-        let chatViewModel = ChatViewModel(
-            repository: AnthropicAPIRepository(apiKeyStore: apiKeyStore),
-            tools: [
-                WriteFileTool(fileRepository: fileRepository),
-                ReadFileTool(fileRepository: fileRepository),
-                ListFilesTool(fileRepository: fileRepository),
-                DeleteFileTool(fileRepository: fileRepository)
-            ],
-            speechRecognizer: speechRecognizer
-        )
-
-        _chatViewModel = State(initialValue: chatViewModel)
-        _fileRepository = State(initialValue: fileRepository)
-        _apiKeyStore = State(initialValue: apiKeyStore)
+    init(container: AppContainer) {
+        _chatViewModel = State(initialValue: container.makeChatViewModel())
+        _fileRepository = State(initialValue: container.fileRepository)
+        _apiKeyStore = State(initialValue: container.apiKeyStore)
         // Ask for a key on first launch
-        _showAPIKeySettings = State(initialValue: !apiKeyStore.hasKey)
+        _showAPIKeySettings = State(initialValue: !container.apiKeyStore.hasKey)
     }
 
     var body: some View {
@@ -52,5 +37,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(container: AppContainer())
 }
