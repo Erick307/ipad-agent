@@ -84,29 +84,40 @@ final class AgentLoop {
                 emit(.assistantText(response.textContent))
             }
 
+            // No default: a new StopReason case won't compile until it's handled here
             switch response.stopReason {
-            case "tool_use" where !response.toolCalls.isEmpty:
+            case .toolUse where !response.toolCalls.isEmpty:
                 print("🛠️  Step \(step): Claude called \(response.toolCalls.count) tool(s)")
                 history.append(assistantTurn(response))
                 history.append(await toolResultsTurn(for: response.toolCalls, emit: emit))
                 // Next iteration sends the results back so Claude can see them
 
-            case "end_turn", "stop_sequence":
+            case .endTurn, .stopSequence:
                 // An empty assistant turn would be rejected on the next request
                 if !response.content.isEmpty {
                     history.append(assistantTurn(response))
                 }
                 return
 
-            case "max_tokens":
+            case .pauseTurn:
+                // A server-side tool loop hit its iteration limit. Sending the turn
+                // back with no new user message lets the server resume where it
+                // stopped. No server tools are registered today; this keeps one working.
+                history.append(assistantTurn(response))
+
+            case .maxTokens:
                 // The response was cut off. A truncated tool_use input can still
                 // parse as valid JSON (e.g. half a file), so never run its tools.
                 throw AgentError.maxTokens
 
-            case "refusal":
+            case .modelContextWindowExceeded:
+                // Also truncated, so the same rule applies: never run its tools
+                throw AgentError.contextWindowExceeded
+
+            case .refusal:
                 throw AgentError.refusal
 
-            default:
+            case .toolUse, .unknown:
                 throw AgentError.unexpectedStop(response.stopReason)
             }
         }

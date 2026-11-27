@@ -112,7 +112,7 @@ struct AgentLoopTests {
     @Test func truncatedResponseNeverRunsItsTools() async throws {
         let tool = FakeTool()
         let (agent, _) = makeAgent(
-            [.toolUse("fake_tool", stopReason: "max_tokens")],
+            [.toolUse("fake_tool", stopReason: .maxTokens)],
             tools: [tool]
         )
 
@@ -124,7 +124,7 @@ struct AgentLoopTests {
     }
 
     @Test func refusalStopsTheLoop() async throws {
-        let (agent, _) = makeAgent([.text("I can't help with that.", stopReason: "refusal")])
+        let (agent, _) = makeAgent([.text("I can't help with that.", stopReason: .refusal)])
 
         let (events, error) = await run(agent, "Something bad")
 
@@ -157,5 +157,52 @@ struct AgentLoopTests {
         // Once the first message finishes, the loop takes new ones again
         let (_, nextError) = await run(agent, "Again")
         #expect(nextError == nil)
+    }
+
+    @Test func fullContextWindowNeverRunsItsTools() async throws {
+        let tool = FakeTool()
+        let (agent, _) = makeAgent(
+            [.toolUse("fake_tool", stopReason: .modelContextWindowExceeded)],
+            tools: [tool]
+        )
+
+        let (_, error) = await run(agent, "Read every file")
+
+        #expect(error as? AgentError == .contextWindowExceeded)
+        #expect(tool.calls.isEmpty)
+    }
+
+    @Test func pausedTurnIsSentBackWithoutANewUserMessage() async throws {
+        let (agent, repository) = makeAgent([
+            .text("Searching…", stopReason: .pauseTurn),
+            .text("Found it.")
+        ])
+
+        let (events, error) = await run(agent, "Look it up")
+
+        #expect(error == nil)
+        #expect(events == [.assistantText("Searching…"), .assistantText("Found it.")])
+        // The resumed request ends with the paused assistant turn: user, assistant
+        let resumed = repository.requests[1].messages
+        #expect(resumed.count == 2)
+        #expect(try json(resumed[1])["role"]?.stringValue == "assistant")
+    }
+
+    @Test func unknownStopReasonIsReported() async throws {
+        let (agent, _) = makeAgent([.text("Hm.", stopReason: .unknown("brand_new_reason"))])
+
+        let (_, error) = await run(agent, "Hi")
+
+        #expect(error as? AgentError == .unexpectedStop(.unknown("brand_new_reason")))
+        #expect(error?.localizedDescription == "Unexpected stop reason: brand_new_reason")
+    }
+
+    @Test func stopReasonDecodesKnownValuesAndKeepsUnknownOnes() throws {
+        let data = Data(#"["end_turn", "pause_turn", "model_context_window_exceeded", "brand_new_reason"]"#.utf8)
+
+        let reasons = try JSONDecoder().decode([StopReason].self, from: data)
+
+        #expect(reasons == [.endTurn, .pauseTurn, .modelContextWindowExceeded, .unknown("brand_new_reason")])
+        #expect(reasons.map(\.rawValue) == ["end_turn", "pause_turn", "model_context_window_exceeded", "brand_new_reason"])
     }
 }

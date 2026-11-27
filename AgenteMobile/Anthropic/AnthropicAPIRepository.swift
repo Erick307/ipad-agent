@@ -32,7 +32,7 @@ private struct APIResponse: Decodable {
     let id: String
     /// Decoded as raw JSON so blocks round-trip into the history unchanged.
     let content: [JSONValue]
-    let stop_reason: String
+    let stop_reason: StopReason
 }
 
 // MARK: - AnthropicAPIRepository
@@ -102,7 +102,7 @@ final class AnthropicAPIRepository: AnthropicRepository {
         print("✅ Parsed response:")
         print("   Text: \(textContent.isEmpty ? "(empty)" : String(textContent.prefix(50)))…")
         print("   Tool calls: \(toolCalls.count)")
-        print("   Stop reason: \(response.stop_reason)")
+        print("   Stop reason: \(response.stop_reason.rawValue)")
 
         return ClaudeResponse(
             id: response.id,

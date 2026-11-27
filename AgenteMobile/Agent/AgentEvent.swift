@@ -16,21 +16,25 @@ enum AgentEvent: Equatable {
 /// Why the agent loop stopped before Claude finished its turn.
 enum AgentError: LocalizedError, Equatable {
     case maxTokens
+    case contextWindowExceeded
     case refusal
     case stepLimitReached(Int)
-    case unexpectedStop(String)
+    case unexpectedStop(StopReason)
     case alreadyRunning
 
     var errorDescription: String? {
         switch self {
         case .maxTokens:
             return "The response was cut off (max_tokens). Try a shorter request."
+        case .contextWindowExceeded:
+            // The history is only in memory, so a relaunch is the one way to clear it today
+            return "This conversation has filled Claude's context window. Restart the app to start a new one."
         case .refusal:
             return "Claude declined to complete this request."
         case .stepLimitReached(let steps):
             return "Stopped after \(steps) steps. Send another message to continue."
         case .unexpectedStop(let reason):
-            return "Unexpected stop reason: \(reason)"
+            return "Unexpected stop reason: \(reason.rawValue)"
         case .alreadyRunning:
             return "Claude is still working on the previous message."
         }

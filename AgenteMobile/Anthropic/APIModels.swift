@@ -105,6 +105,53 @@ indirect enum JSONValue: Codable {
 
 // MARK: - Responses
 
+/// Why Claude stopped generating, decoded from `stop_reason`.
+///
+/// `unknown` keeps a value added to the API after this app shipped, so a new
+/// stop reason fails the turn with a clear error instead of failing to decode.
+enum StopReason: Decodable, Equatable {
+    case endTurn
+    case maxTokens
+    case stopSequence
+    case toolUse
+    /// A server-side tool loop (web search, code execution) hit its iteration limit.
+    case pauseTurn
+    case refusal
+    case modelContextWindowExceeded
+    case unknown(String)
+
+    init(rawValue: String) {
+        switch rawValue {
+        case "end_turn": self = .endTurn
+        case "max_tokens": self = .maxTokens
+        case "stop_sequence": self = .stopSequence
+        case "tool_use": self = .toolUse
+        case "pause_turn": self = .pauseTurn
+        case "refusal": self = .refusal
+        case "model_context_window_exceeded": self = .modelContextWindowExceeded
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+    }
+
+    /// The value exactly as the API sends it.
+    var rawValue: String {
+        switch self {
+        case .endTurn: return "end_turn"
+        case .maxTokens: return "max_tokens"
+        case .stopSequence: return "stop_sequence"
+        case .toolUse: return "tool_use"
+        case .pauseTurn: return "pause_turn"
+        case .refusal: return "refusal"
+        case .modelContextWindowExceeded: return "model_context_window_exceeded"
+        case .unknown(let value): return value
+        }
+    }
+}
+
 struct ToolCall {
     let id: String
     let name: String
@@ -118,7 +165,7 @@ struct ClaudeResponse {
     /// All `text` blocks joined, for display.
     let textContent: String
     let toolCalls: [ToolCall]
-    let stopReason: String
+    let stopReason: StopReason
     /// Every content block exactly as returned (text, tool_use, thinking, ...).
     /// Append this to the history unchanged so no block is lost between turns.
     let content: [JSONValue]

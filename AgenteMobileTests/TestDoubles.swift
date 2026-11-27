@@ -67,7 +67,7 @@ final class FakeTool: AgentTool {
 // MARK: - Response builders
 
 extension ClaudeResponse {
-    static func text(_ text: String, stopReason: String = "end_turn") -> ClaudeResponse {
+    static func text(_ text: String, stopReason: StopReason = .endTurn) -> ClaudeResponse {
         ClaudeResponse(
             id: "msg_text",
             textContent: text,
@@ -81,7 +81,7 @@ extension ClaudeResponse {
         _ name: String,
         id: String = "toolu_1",
         input: [String: JSONValue] = [:],
-        stopReason: String = "tool_use"
+        stopReason: StopReason = .toolUse
     ) -> ClaudeResponse {
         ClaudeResponse(
             id: "msg_tool",
