@@ -10,11 +10,14 @@ import Observation
 
 enum FileRepositoryError: LocalizedError {
     case fileNotFound(String)
+    case invalidFilename(String)
 
     var errorDescription: String? {
         switch self {
         case .fileNotFound(let name):
             return "File '\(name)' not found"
+        case .invalidFilename(let name):
+            return "Invalid filename '\(name)'. Use a plain name like 'notes.md', without folders or path characters."
         }
     }
 }
@@ -23,13 +26,40 @@ enum FileRepositoryError: LocalizedError {
 final class FileRepository {
     var files: [GeneratedFile] = []
 
-    var documentDirectory: URL {
-        let baseDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return baseDirectory.appendingPathComponent(AppConstants.FILE_DIRECTORY_NAME)
+    let documentDirectory: URL
+
+    /// - Parameter directory: Where files are stored. Defaults to `Documents/AgentFiles`;
+    ///   tests pass a temporary directory.
+    init(directory: URL? = nil) {
+        self.documentDirectory = directory ?? FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(AppConstants.FILE_DIRECTORY_NAME)
+        loadFiles()
     }
 
-    init() {
-        loadFiles()
+    // MARK: - Filename Validation
+
+    /// Resolves a filename supplied by Claude to a URL directly inside `documentDirectory`.
+    ///
+    /// Filenames come from the model, and file contents it reads can try to steer it,
+    /// so a name like `../../Library/x` must never reach the file system.
+    /// Only plain names are accepted; anything that could act as a path is rejected.
+    func fileURL(for filename: String) throws -> URL {
+        let forbiddenCharacters = CharacterSet(charactersIn: "/\\:\0")
+        guard !filename.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !filename.hasPrefix("."),
+              filename.rangeOfCharacter(from: forbiddenCharacters) == nil,
+              filename.rangeOfCharacter(from: .controlCharacters) == nil else {
+            throw FileRepositoryError.invalidFilename(filename)
+        }
+
+        // Defense in depth: the resolved file must sit directly in the folder
+        let fileURL = documentDirectory.appendingPathComponent(filename, isDirectory: false)
+        guard fileURL.standardizedFileURL.deletingLastPathComponent().path
+                == documentDirectory.standardizedFileURL.path else {
+            throw FileRepositoryError.invalidFilename(filename)
+        }
+        return fileURL
     }
 
     private func loadFiles() {
@@ -48,6 +78,8 @@ final class FileRepository {
     // MARK: - Write
 
     func writeFile(filename: String, content: String) async throws -> GeneratedFile {
+        let filePath = try fileURL(for: filename)
+
         // Ensure directory exists
         try FileManager.default.createDirectory(
             at: documentDirectory,
@@ -55,7 +87,6 @@ final class FileRepository {
             attributes: nil
         )
 
-        let filePath = documentDirectory.appendingPathComponent(filename)
         let data = content.data(using: .utf8) ?? Data()
         try data.write(to: filePath, options: .atomic)
 
@@ -80,7 +111,7 @@ final class FileRepository {
     // MARK: - Read
 
     func readFileByName(_ filename: String) async throws -> String {
-        let filePath = documentDirectory.appendingPathComponent(filename)
+        let filePath = try fileURL(for: filename)
         guard FileManager.default.fileExists(atPath: filePath.path) else {
             throw FileRepositoryError.fileNotFound(filename)
         }
@@ -132,7 +163,7 @@ final class FileRepository {
     }
 
     func deleteFileByName(_ filename: String) async throws {
-        let filePath = documentDirectory.appendingPathComponent(filename)
+        let filePath = try fileURL(for: filename)
         guard FileManager.default.fileExists(atPath: filePath.path) else {
             throw FileRepositoryError.fileNotFound(filename)
         }

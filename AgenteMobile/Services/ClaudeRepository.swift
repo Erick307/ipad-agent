@@ -325,7 +325,7 @@ class ClaudeRepository {
                 properties: [
                     "filename": PropertySchema(
                         type: "string",
-                        description: "Name of the file (e.g. 'shopping_list.md'). Use .md extension for markdown."
+                        description: "Plain file name with no folders or path characters (e.g. 'shopping_list.md'). Use .md extension for markdown."
                     ),
                     "content": PropertySchema(
                         type: "string",
